@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 
 import os
-import json
+import csv
+import sys
+import datetime
 
-from datetime import datetime
 
 CSV_DELIMITER = ","
 CSV_HEADLINE = "secs,cad,hr,km,kph,nm,watts,alt,lon,lat,headwind,slope,temp,interval,lrbalance,lte,rte,lps,rps,smo2,thb,o2hb,hhb\n"
-
 
 
 class ride_data_point:
@@ -36,11 +36,11 @@ class ride_data_point:
         self.o2hb = ''
         self.hhb = ''
         
+        
 
-def write_ride_file(ride_data_points):
-    filename = "filename" + ".csv"
+def write_ride_file(ride_data_points, target_file):
     
-    fh = open(filename,"w")
+    fh = open(target_file,"w")
     fh.write(CSV_HEADLINE)
     
     csvLine = ""
@@ -76,10 +76,57 @@ def write_ride_file(ride_data_points):
     fh.close()
     
     
+    
+def read_jergotrainer_file(filepath):
+    
+    jergoridedata = []
+    
+    with open(filepath, newline='') as csvfile:
+        jergotrainer_file = csv.reader(csvfile, delimiter=';', quotechar='|')
+        
+        armed = False
+        
+        for row in jergotrainer_file:
+            if (not armed) and (row[0] == '[Data]'):
+                armed = True
+            elif armed:
+                new_point = ride_data_point()
+                new_point.secs = row[4]
+                new_point.watts = row[5]
+                new_point.hr = row[6]
+                new_point.cad = row[7]
+                new_point.kph = row[8]
+                new_point.km = row[9]
+
+                jergoridedata.append(new_point)
+                
+    return jergoridedata
 
 
 
-# TODO: for all csv files with jergotrainer format do....
-def  scan_and_convert_directoy (dir_path):
-    pass
+# for all csv files with jergotrainer format do....
+def scan_and_convert_directoy (dir_path):
 
+    directory = os.path.join(dir_path)
+    for root,dirs,files in os.walk(directory):
+        for file in files:
+           if file.endswith(".csv"):
+               
+               try:
+                   date_time_obj = datetime.datetime.strptime(file, 'P_%Y%m%d_%H%M%S.csv')
+                   gc_file_name = date_time_obj.strftime("%Y_%m_%d_%H_%M_%S.csv")
+    
+                   print(file + " -> " + gc_file_name)
+                   
+                   ride_data = read_jergotrainer_file(os.path.join(dir_path, file))
+                   write_ride_file (ride_data, os.path.join(dir_path, gc_file_name))
+               except BaseException as e:
+                   print('File ' + str(file) + ' not suitable to convert! \n   ' + str(e))
+
+
+
+if len(sys.argv) == 2:
+    scan_and_convert_directoy (str(sys.argv[1]))
+else:
+    scan_and_convert_directoy (os.getcwd())
+    
